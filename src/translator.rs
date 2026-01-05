@@ -181,13 +181,14 @@ impl Translator {
 
                 // Retry loop for this chunk
                 let mut attempt = 0;
-                let mut last_error = None;
+                let mut last_error: Option<TranslationError> = None;
 
                 while attempt < self.translation_config.retries {
-                    match self
+                    let translation_result = self
                         .translate_single_chunk(chunk, &mut history, progress.clone())
-                        .await
-                    {
+                        .await;
+
+                    match translation_result {
                         Ok(translated) => {
                             results.push(translated);
                             last_error = None;
@@ -332,7 +333,11 @@ impl Translator {
 
         let mut stream = response.bytes_stream();
 
-        while let Some(chunk_result) = stream.next().await {
+        loop {
+            let chunk_result = stream.next().await;
+            let Some(chunk_result) = chunk_result else {
+                break;
+            };
             let bytes = chunk_result?;
             let text = String::from_utf8_lossy(&bytes);
 
@@ -477,7 +482,8 @@ pub async fn translate_text(
         title_prompt.to_string(),
         content_prompt.to_string(),
     );
-    translator.translate(text, is_title, progress_info).await
+    let result = translator.translate(text, is_title, progress_info).await;
+    result
 }
 
 #[cfg(test)]
