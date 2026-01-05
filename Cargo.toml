@@ -18,6 +18,7 @@ thiserror = "2.0.17"
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "time", "fs"] }
 toml = "0.9.10"
 url = "2.5.7"
+which = "8.0.0"
 
 [dev-dependencies]
 tempfile = "3.24.0"

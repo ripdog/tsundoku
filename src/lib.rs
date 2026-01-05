@@ -9,6 +9,7 @@ pub mod config;
 pub mod console;
 pub mod error;
 pub mod name_mapping;
+pub mod name_scout;
 pub mod scrapers;
 pub mod translator;
 
@@ -17,5 +18,6 @@ pub use config::Config;
 pub use console::Console;
 pub use error::{ConfigError, NameMappingError, ScraperError, TranslationError};
 pub use name_mapping::{NameEntry, NameMappingStore, NamePart};
+pub use name_scout::NameScout;
 pub use scrapers::{ChapterInfo, ChapterList, NovelInfo, Scraper, ScraperRegistry};
 pub use translator::{ProgressInfo, Translator};

@@ -3,8 +3,12 @@
 //! This module defines the interface that all scrapers must implement,
 //! along with common data types for novels and chapters.
 
+mod kakuyomu;
+mod pixiv;
 mod syosetu;
 
+pub use kakuyomu::KakuyomuScraper;
+pub use pixiv::PixivScraper;
 pub use syosetu::SyosetuScraper;
 
 use crate::config::ScrapingConfig;
@@ -106,7 +110,8 @@ impl ScraperRegistry {
     pub fn new(config: &ScrapingConfig) -> Self {
         let scrapers: Vec<Box<dyn Scraper>> = vec![
             Box::new(SyosetuScraper::new(config.clone())),
-            // Add more scrapers here as they are implemented
+            Box::new(KakuyomuScraper::new(config.clone())),
+            Box::new(PixivScraper::new(config.clone())),
         ];
 
         Self { scrapers }
