@@ -217,7 +217,7 @@ async fn process_oneshot(
     };
 
     // Run name scout
-    run_name_scout(
+    let scouted = run_name_scout(
         console,
         name_scout,
         name_mapping,
@@ -225,8 +225,8 @@ async fn process_oneshot(
     )
     .await?;
 
-    // Manual review
-    if !no_name_pause {
+    // Manual review (only if scouting was performed)
+    if !no_name_pause && scouted {
         manual_name_review(console, name_mapping)?;
     }
 
@@ -352,10 +352,10 @@ async fn process_chapters(
         .map(|c| (c.number, c.title.as_str(), c.content.as_str()))
         .collect();
 
-    run_name_scout(console, name_scout, name_mapping, &scout_data).await?;
+    let scouted = run_name_scout(console, name_scout, name_mapping, &scout_data).await?;
 
-    // Manual review
-    if !no_name_pause {
+    // Manual review (only if scouting was performed)
+    if !no_name_pause && scouted {
         manual_name_review(console, name_mapping)?;
     }
 
@@ -428,12 +428,13 @@ async fn process_chapters(
 }
 
 /// Runs name scout on chapters that haven't been covered.
+/// Returns true if any scouting was performed, false if all chapters were already covered.
 async fn run_name_scout(
     console: &Console,
     name_scout: &NameScout,
     name_mapping: &mut NameMappingStore,
     chapters: &[(u32, &str, &str)], // (number, title, content)
-) -> Result<()> {
+) -> Result<bool> {
     console.section("Name Scout Phase");
 
     let uncovered: Vec<_> = chapters
@@ -443,7 +444,7 @@ async fn run_name_scout(
 
     if uncovered.is_empty() {
         console.info("All chapters already scouted for names");
-        return Ok(());
+        return Ok(false);
     }
 
     console.info(&format!(
@@ -476,7 +477,7 @@ async fn run_name_scout(
         name_mapping.len()
     ));
 
-    Ok(())
+    Ok(true)
 }
 
 /// Prompts user to review and edit name mappings.

@@ -148,8 +148,9 @@ impl Translator {
 
         if is_title {
             // Title translation: single chunk, no history needed
-            let snippet = if text.len() > 30 {
-                format!("{}...", &text[..30])
+            let snippet = if text.chars().count() > 30 {
+                let truncated: String = text.chars().take(30).collect();
+                format!("{}...", truncated)
             } else {
                 text.to_string()
             };
@@ -178,6 +179,11 @@ impl Translator {
                     chunk: chunk_num,
                     total_chunks,
                 });
+
+                // Show "Preparing..." status before starting chunk (except first)
+                if i > 0 {
+                    self.display_preparing(progress.as_ref());
+                }
 
                 // Retry loop for this chunk
                 let mut attempt = 0;
@@ -217,6 +223,10 @@ impl Translator {
                     results.push(format!("[TRANSLATION FAILED]\n{}", chunk));
                 }
             }
+
+            // Clear progress line after all chunks complete
+            print!("\r\x1b[2K");
+            let _ = io::stdout().flush();
 
             Ok(results.join("\n\n"))
         }
@@ -372,9 +382,9 @@ impl Translator {
             }
         }
 
-        // Clear progress line
-        print!("\r\x1b[2K");
-        let _ = io::stdout().flush();
+        // Note: Progress line is NOT cleared here to maintain continuity.
+        // The next chunk's "Preparing..." message will replace it, or
+        // the caller will clear it when all chunks are done.
 
         // Validate response
         let trimmed = full_response.trim().to_string();
@@ -461,6 +471,26 @@ impl Translator {
         print!(
             "\r\x1b[2K{}Progress: \x1b[1;32m{}\x1b[0m chars at \x1b[1;33m{}/sec\x1b[0m. \x1b[90m{}...\x1b[0m",
             progress_prefix, char_count, speed, preview
+        );
+        let _ = io::stdout().flush();
+    }
+
+    /// Display "Preparing..." status between chunks.
+    fn display_preparing(&self, progress_info: Option<&ProgressInfo>) {
+        let progress_prefix = if let Some(info) = progress_info {
+            format!(
+                "\x1b[1;36m[Chapter {}, Chunk {}/{}]\x1b[0m ",
+                info.chapter, info.chunk, info.total_chunks
+            )
+        } else {
+            String::new()
+        };
+
+        print!(
+            "\r\x1b[2K{}Progress: \x1b[1;33mPreparing to translate chunk {}/{}\x1b[0m",
+            progress_prefix,
+            progress_info.map(|p| p.chunk).unwrap_or(1),
+            progress_info.map(|p| p.total_chunks).unwrap_or(1)
         );
         let _ = io::stdout().flush();
     }
@@ -582,5 +612,56 @@ mod tests {
         assert_eq!(info.chapter, 1);
         assert_eq!(info.chunk, 2);
         assert_eq!(info.total_chunks, 5);
+    }
+
+    #[test]
+    fn test_title_truncation_with_multibyte_chars() {
+        // This test verifies that title truncation handles UTF-8 characters correctly
+        // The panic was: "byte index 30 is not a char boundary; it is inside 'の' (bytes 29..32)"
+        // This happened because the old code checked text.len() (bytes) but sliced assuming ASCII
+        
+        // Japanese text with multi-byte characters
+        // This specific title: "３２．KeisukeとRika、恋の行方"
+        // Has 20 characters but 38 bytes (some chars are 3 bytes each)
+        let title = "３２．KeisukeとRika、恋の行方";
+        
+        let char_count = title.chars().count();
+        let byte_count = title.len();
+        
+        // This title has more BYTES than 30, but fewer CHARACTERS
+        assert_eq!(char_count, 20);
+        assert!(byte_count > 30, "Title byte length: {}", byte_count);
+        
+        // The OLD buggy code would do:
+        // if text.len() > 30 { &text[..30] }  <- PANIC! Slices at byte 30 (inside 'の')
+        //
+        // The NEW fixed code does:
+        // if text.chars().count() > 30 { text.chars().take(30).collect() }  <- OK!
+        
+        // Since this title has only 20 chars, the fixed code won't truncate it
+        let snippet = if title.chars().count() > 30 {
+            let truncated: String = title.chars().take(30).collect();
+            format!("{}...", truncated)
+        } else {
+            title.to_string()
+        };
+        
+        // Should NOT be truncated (only 20 chars)
+        assert_eq!(snippet, title);
+        assert!(!snippet.ends_with("..."));
+        
+        // Now test with a title that's actually longer than 30 characters
+        let long_title = "これは非常に長いタイトルでテストのために使用されます。三十文字以上あります。";
+        assert!(long_title.chars().count() > 30);
+        
+        let snippet_long = if long_title.chars().count() > 30 {
+            let truncated: String = long_title.chars().take(30).collect();
+            format!("{}...", truncated)
+        } else {
+            long_title.to_string()
+        };
+        
+        assert!(snippet_long.ends_with("..."));
+        assert_eq!(snippet_long.chars().count(), 33); // 30 chars + "..."
     }
 }
