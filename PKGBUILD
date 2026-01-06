@@ -7,20 +7,24 @@ arch=('x86_64' 'aarch64')
 url="https://github.com/ripdog/tsundoku"
 license=('GPL-3.0-or-later')
 depends=('gcc-libs')
-makedepends=('rust' 'cargo')
+makedepends=('rust' 'cargo' 'cmake')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/ripdog/tsundoku/archive/v$pkgver.tar.gz")
-sha256sums=('99d639a149bfc2273a6c6bdee762bc0296e2a97c8672e0fce9fcf1ec70b7ff37')
+sha256sums=('8e5c5c7fd36979af6fa727698f10f1b2e7776fbb50c49425cb205f7a5860cebe')
 
 prepare() {
     cd "$pkgname-$pkgver"
     export RUSTUP_TOOLCHAIN=stable
-    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')" --manifest-path=Cargo.toml
 }
 
 build() {
     cd "$pkgname-$pkgver"
     export RUSTUP_TOOLCHAIN=stable
     export CARGO_TARGET_DIR=target
+    # Clear LDFLAGS and CFLAGS that might interfere with aws-lc-sys
+    unset LDFLAGS
+    unset CFLAGS
+    unset CXXFLAGS
     cargo build --frozen --release --all-features
 }
 
