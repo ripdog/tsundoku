@@ -4,3 +4,9 @@
 /.idea
 #opencode
 /logs
+
+#makepkg artifacts
+*.tar.gz
+*.pkg.tar.zst
+/src
+/pkg
