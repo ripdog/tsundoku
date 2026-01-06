@@ -29,28 +29,24 @@ const ENGLISH_HONORIFICS: &[&str] = &[
 ];
 
 /// Indicates what part of a name this is (family name, given name, or unknown).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum NamePart {
     Family,
     Given,
+    #[default]
     Unknown,
 }
 
-impl Default for NamePart {
-    fn default() -> Self {
-        Self::Unknown
-    }
-}
+impl std::str::FromStr for NamePart {
+    type Err = std::convert::Infallible;
 
-impl NamePart {
-    /// Parse a string into a NamePart, defaulting to Unknown.
-    pub fn from_str(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
             "family" => Self::Family,
             "given" => Self::Given,
             _ => Self::Unknown,
-        }
+        })
     }
 }
 
@@ -105,8 +101,7 @@ impl NameInfo {
         let mut best_count: u32 = 0;
 
         for (english, &count) in &self.votes {
-            if count > best_count
-                || (count == best_count && self.english.as_ref().map_or(true, |e| e != english))
+            if count > best_count || (count == best_count && self.english.as_ref() != Some(english))
             {
                 // Take this one if it has more votes, or same votes but we have no current best
                 if count > best_count {
@@ -136,21 +131,12 @@ impl NameInfo {
 }
 
 /// The full name mapping data structure.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct NameMappingData {
     /// Map from original Japanese names to their info.
     pub names: HashMap<String, NameInfo>,
     /// List of chapter numbers that have been scouted.
     pub coverage: Vec<u32>,
-}
-
-impl Default for NameMappingData {
-    fn default() -> Self {
-        Self {
-            names: HashMap::new(),
-            coverage: Vec::new(),
-        }
-    }
 }
 
 /// Name mapping store for a specific novel.
@@ -395,11 +381,11 @@ mod tests {
 
     #[test]
     fn test_name_part_from_str() {
-        assert_eq!(NamePart::from_str("family"), NamePart::Family);
-        assert_eq!(NamePart::from_str("FAMILY"), NamePart::Family);
-        assert_eq!(NamePart::from_str("given"), NamePart::Given);
-        assert_eq!(NamePart::from_str("unknown"), NamePart::Unknown);
-        assert_eq!(NamePart::from_str("invalid"), NamePart::Unknown);
+        assert_eq!("family".parse::<NamePart>().unwrap(), NamePart::Family);
+        assert_eq!("FAMILY".parse::<NamePart>().unwrap(), NamePart::Family);
+        assert_eq!("given".parse::<NamePart>().unwrap(), NamePart::Given);
+        assert_eq!("unknown".parse::<NamePart>().unwrap(), NamePart::Unknown);
+        assert_eq!("invalid".parse::<NamePart>().unwrap(), NamePart::Unknown);
     }
 
     #[test]

@@ -41,6 +41,18 @@ struct ChapterData {
     filename: String,
 }
 
+/// Parameters for processing novels.
+struct ProcessParams<'a> {
+    console: &'a Console,
+    scraper: &'a dyn tsundoku::scrapers::Scraper,
+    novel_info: &'a tsundoku::scrapers::NovelInfo,
+    output_dir: &'a Path,
+    translator: &'a Translator,
+    name_scout: &'a NameScout,
+    name_mapping: &'a mut NameMappingStore,
+    no_name_pause: bool,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
@@ -136,34 +148,23 @@ async fn main() -> Result<()> {
     // Get output directory
     let output_dir = expand_path(&config.paths.output_directory);
 
+    // Create process params
+    let mut params = ProcessParams {
+        console: &console,
+        scraper,
+        novel_info: &novel_info,
+        output_dir: &output_dir,
+        translator: &translator,
+        name_scout: &name_scout,
+        name_mapping: &mut name_mapping,
+        no_name_pause: args.no_name_pause,
+    };
+
     // Process based on chapter type
     if chapter_list.is_oneshot() {
-        process_oneshot(
-            &console,
-            scraper,
-            &novel_info,
-            &output_dir,
-            &translator,
-            &name_scout,
-            &mut name_mapping,
-            args.no_name_pause,
-        )
-        .await?;
+        process_oneshot(&mut params).await?;
     } else if let ChapterList::Chapters(chapters) = &chapter_list {
-        process_chapters(
-            &console,
-            scraper,
-            &novel_info,
-            chapters,
-            start_chapter,
-            end_chapter,
-            &output_dir,
-            &translator,
-            &name_scout,
-            &mut name_mapping,
-            args.no_name_pause,
-        )
-        .await?;
+        process_chapters(&mut params, chapters, start_chapter, end_chapter).await?;
     }
 
     console.section("Done!");
@@ -171,45 +172,36 @@ async fn main() -> Result<()> {
 }
 
 /// Processes a one-shot story.
-async fn process_oneshot(
-    console: &Console,
-    scraper: &dyn tsundoku::scrapers::Scraper,
-    novel_info: &tsundoku::scrapers::NovelInfo,
-    output_dir: &Path,
-    translator: &Translator,
-    name_scout: &NameScout,
-    name_mapping: &mut NameMappingStore,
-    no_name_pause: bool,
-) -> Result<()> {
-    console.section("Processing One-Shot Story");
+async fn process_oneshot(params: &mut ProcessParams<'_>) -> Result<()> {
+    params.console.section("Processing One-Shot Story");
 
     // Find or create story folder
     let folder_name = find_or_create_folder(
-        console,
-        output_dir,
-        scraper.id(),
-        &novel_info.novel_id,
-        &novel_info.title,
-        translator,
+        params.console,
+        params.output_dir,
+        params.scraper.id(),
+        &params.novel_info.novel_id,
+        &params.novel_info.title,
+        params.translator,
     )
     .await?;
 
-    let story_dir = output_dir.join(&folder_name);
+    let story_dir = params.output_dir.join(&folder_name);
     std::fs::create_dir_all(&story_dir)?;
 
     // Download original content if not exists
     let original_path = story_dir.join("original.txt");
     let content = if original_path.exists() {
-        console.info("Original content already exists, loading...");
+        params.console.info("Original content already exists, loading...");
         std::fs::read_to_string(&original_path)?
     } else {
-        console.step("Downloading original content...");
-        let content = scraper
-            .download_chapter(&novel_info.base_url)
+        params.console.step("Downloading original content...");
+        let content = params.scraper
+            .download_chapter(&params.novel_info.base_url)
             .await
             .context("Failed to download content")?;
         std::fs::write(&original_path, &content)?;
-        console.success(&format!(
+        params.console.success(&format!(
             "Saved original ({} chars)",
             content.chars().count()
         ));
@@ -218,27 +210,27 @@ async fn process_oneshot(
 
     // Run name scout
     let scouted = run_name_scout(
-        console,
-        name_scout,
-        name_mapping,
-        &[(1, &novel_info.title, &content)],
+        params.console,
+        params.name_scout,
+        params.name_mapping,
+        &[(1, &params.novel_info.title, &content)],
     )
     .await?;
 
     // Manual review (only if scouting was performed)
-    if !no_name_pause && scouted {
-        manual_name_review(console, name_mapping)?;
+    if !params.no_name_pause && scouted {
+        manual_name_review(params.console, params.name_mapping)?;
     }
 
     // Translate content
     let translated_path = story_dir.join("oneshot.txt");
     if translated_path.exists() {
-        console.info("Translation already exists, skipping...");
+        params.console.info("Translation already exists, skipping...");
     } else {
-        console.step("Translating content...");
+        params.console.step("Translating content...");
 
         // Apply name mapping
-        let mapped_content = name_mapping.apply_to_text(&content);
+        let mapped_content = params.name_mapping.apply_to_text(&content);
 
         let progress = ProgressInfo {
             chapter: 1,
@@ -246,13 +238,13 @@ async fn process_oneshot(
             total_chunks: 1,
         };
 
-        let translated = translator
+        let translated = params.translator
             .translate(&mapped_content, false, Some(progress))
             .await
             .context("Failed to translate content")?;
 
         std::fs::write(&translated_path, &translated)?;
-        console.success("Translation saved");
+        params.console.success("Translation saved");
     }
 
     Ok(())
@@ -260,32 +252,25 @@ async fn process_oneshot(
 
 /// Processes multi-chapter stories.
 async fn process_chapters(
-    console: &Console,
-    scraper: &dyn tsundoku::scrapers::Scraper,
-    novel_info: &tsundoku::scrapers::NovelInfo,
+    params: &mut ProcessParams<'_>,
     chapters: &[ChapterInfo],
     start_chapter: u32,
     end_chapter: u32,
-    output_dir: &Path,
-    translator: &Translator,
-    name_scout: &NameScout,
-    name_mapping: &mut NameMappingStore,
-    no_name_pause: bool,
 ) -> Result<()> {
-    console.section("Processing Multi-Chapter Story");
+    params.console.section("Processing Multi-Chapter Story");
 
     // Find or create story folder
     let folder_name = find_or_create_folder(
-        console,
-        output_dir,
-        scraper.id(),
-        &novel_info.novel_id,
-        &novel_info.title,
-        translator,
+        params.console,
+        params.output_dir,
+        params.scraper.id(),
+        &params.novel_info.novel_id,
+        &params.novel_info.title,
+        params.translator,
     )
     .await?;
 
-    let story_dir = output_dir.join(&folder_name);
+    let story_dir = params.output_dir.join(&folder_name);
     let original_dir = story_dir.join("Original");
     std::fs::create_dir_all(&original_dir)?;
 
@@ -294,7 +279,7 @@ async fn process_chapters(
     let padding = total_chapters.to_string().len();
 
     // Download phase
-    console.section("Download Phase");
+    params.console.section("Download Phase");
 
     let mut downloaded_chapters: Vec<ChapterData> = Vec::new();
 
@@ -312,21 +297,21 @@ async fn process_chapters(
         let original_path = original_dir.join(&filename);
 
         let content = if original_path.exists() {
-            console.info(&format!("Chapter {} already downloaded", chapter.number));
+            params.console.info(&format!("Chapter {} already downloaded", chapter.number));
             std::fs::read_to_string(&original_path)?
         } else {
-            console.step(&format!(
+            params.console.step(&format!(
                 "Downloading chapter {}: {}",
                 chapter.number, chapter.title
             ));
 
-            let content = scraper
+            let content = params.scraper
                 .download_chapter(&chapter.url)
                 .await
                 .with_context(|| format!("Failed to download chapter {}", chapter.number))?;
 
             std::fs::write(&original_path, &content)?;
-            console.success(&format!(
+            params.console.success(&format!(
                 "Saved ({} chars)",
                 content.chars().count()
             ));
@@ -342,7 +327,7 @@ async fn process_chapters(
     }
 
     if downloaded_chapters.is_empty() {
-        console.warning("No chapters downloaded");
+        params.console.warning("No chapters downloaded");
         return Ok(());
     }
 
@@ -352,15 +337,15 @@ async fn process_chapters(
         .map(|c| (c.number, c.title.as_str(), c.content.as_str()))
         .collect();
 
-    let scouted = run_name_scout(console, name_scout, name_mapping, &scout_data).await?;
+    let scouted = run_name_scout(params.console, params.name_scout, params.name_mapping, &scout_data).await?;
 
     // Manual review (only if scouting was performed)
-    if !no_name_pause && scouted {
-        manual_name_review(console, name_mapping)?;
+    if !params.no_name_pause && scouted {
+        manual_name_review(params.console, params.name_mapping)?;
     }
 
     // Translation phase
-    console.section("Translation Phase");
+    params.console.section("Translation Phase");
 
     for chapter_data in &downloaded_chapters {
         // Check if translation already exists
@@ -377,21 +362,21 @@ async fn process_chapters(
             });
 
         if translation_exists {
-            console.info(&format!(
+            params.console.info(&format!(
                 "Chapter {} already translated, skipping",
                 chapter_data.number
             ));
             continue;
         }
 
-        console.step(&format!(
+        params.console.step(&format!(
             "Translating chapter {}: {}",
             chapter_data.number, chapter_data.title
         ));
 
         // Translate title
-        let mapped_title = name_mapping.apply_to_text(&chapter_data.title);
-        let translated_title = translator
+        let mapped_title = params.name_mapping.apply_to_text(&chapter_data.title);
+        let translated_title = params.translator
             .translate(&mapped_title, true, None)
             .await
             .unwrap_or_else(|_| {
@@ -402,7 +387,7 @@ async fn process_chapters(
         let safe_title = sanitize_filename(&translated_title);
 
         // Apply name mapping to content
-        let mapped_content = name_mapping.apply_to_text(&chapter_data.content);
+        let mapped_content = params.name_mapping.apply_to_text(&chapter_data.content);
 
         // Translate content
         let progress = ProgressInfo {
@@ -411,7 +396,7 @@ async fn process_chapters(
             total_chunks: 1, // Will be updated by translator
         };
 
-        let translated_content = translator
+        let translated_content = params.translator
             .translate(&mapped_content, false, Some(progress))
             .await
             .context("Failed to translate chapter")?;
@@ -421,7 +406,7 @@ async fn process_chapters(
         let translated_path = story_dir.join(&translated_filename);
         std::fs::write(&translated_path, &translated_content)?;
 
-        console.success(&format!("Saved: {}", translated_filename));
+        params.console.success(&format!("Saved: {}", translated_filename));
     }
 
     Ok(())
@@ -617,16 +602,16 @@ fn sanitize_filename(name: &str) -> String {
         .collect();
 
     // Remove trailing dots and spaces
-    sanitized.trim_end_matches(|c| c == '.' || c == ' ').to_string()
+    sanitized.trim_end_matches(['.', ' ']).to_string()
 }
 
 /// Expands ~ in paths to the home directory.
 fn expand_path(path: &Path) -> PathBuf {
     let path_str = path.to_string_lossy();
-    if path_str.starts_with("~/") {
-        if let Some(home) = dirs::home_dir() {
-            return home.join(&path_str[2..]);
-        }
+    if let Some(stripped) = path_str.strip_prefix("~/")
+        && let Some(home) = dirs::home_dir()
+    {
+        return home.join(stripped);
     }
     path.to_path_buf()
 }

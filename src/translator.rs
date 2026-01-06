@@ -361,19 +361,19 @@ impl Translator {
                     // Try to parse as JSON
                     if let Ok(chunk) = serde_json::from_str::<StreamChunk>(data) {
                         for choice in chunk.choices {
-                            if let Some(delta) = choice.delta {
-                                if let Some(content) = delta.content {
-                                    full_response.push_str(&content);
+                            if let Some(delta) = choice.delta
+                                && let Some(content) = delta.content
+                            {
+                                full_response.push_str(&content);
 
-                                    // Update progress display every second
-                                    if last_update.elapsed() >= Duration::from_secs(1) {
-                                        self.display_progress(
-                                            &full_response,
-                                            start_time.elapsed(),
-                                            progress_info.as_ref(),
-                                        );
-                                        last_update = Instant::now();
-                                    }
+                                // Update progress display every second
+                                if last_update.elapsed() >= Duration::from_secs(1) {
+                                    self.display_progress(
+                                        &full_response,
+                                        start_time.elapsed(),
+                                        progress_info.as_ref(),
+                                    );
+                                    last_update = Instant::now();
                                 }
                             }
                         }
@@ -512,8 +512,7 @@ pub async fn translate_text(
         title_prompt.to_string(),
         content_prompt.to_string(),
     );
-    let result = translator.translate(text, is_title, progress_info).await;
-    result
+    translator.translate(text, is_title, progress_info).await
 }
 
 #[cfg(test)]
@@ -540,8 +539,10 @@ mod tests {
 
     #[test]
     fn test_split_text_by_lines() {
-        let mut config = TranslationConfig::default();
-        config.chunk_size_chars = 20;
+        let config = TranslationConfig {
+            chunk_size_chars: 20,
+            ..Default::default()
+        };
 
         let translator = Translator::new(
             ApiConfig::default(),

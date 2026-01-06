@@ -321,7 +321,8 @@ impl NameScout {
 
                 let part = entry
                     .part
-                    .map(|p| NamePart::from_str(&p))
+                    .as_deref()
+                    .and_then(|p| p.parse().ok())
                     .unwrap_or(NamePart::Unknown);
 
                 Some(NameEntry {
@@ -426,8 +427,10 @@ I hope this helps!"#;
 
     #[test]
     fn test_split_into_chunks() {
-        let mut config = NameScoutConfig::default();
-        config.chunk_size_chars = 50;
+        let config = NameScoutConfig {
+            chunk_size_chars: 50,
+            ..Default::default()
+        };
 
         let scout = NameScout::new(ApiConfig::default(), config, String::new());
 

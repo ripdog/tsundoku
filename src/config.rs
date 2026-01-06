@@ -17,7 +17,7 @@ const CONFIG_FILENAME: &str = "config.toml";
 const API_KEY_PLACEHOLDER: &str = "YOUR_API_KEY_HERE";
 
 /// Main configuration structure.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(default)]
 pub struct Config {
     /// Main translation API configuration.
@@ -40,20 +40,6 @@ pub struct Config {
 
     /// File paths.
     pub paths: PathsConfig,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            api: ApiConfig::default(),
-            scout_api: None,
-            translation: TranslationConfig::default(),
-            name_scout: NameScoutConfig::default(),
-            scraping: ScrapingConfig::default(),
-            prompts: PromptsConfig::default(),
-            paths: PathsConfig::default(),
-        }
-    }
 }
 
 /// API configuration for LLM endpoints.

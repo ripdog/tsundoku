@@ -202,16 +202,15 @@ impl PixivScraper {
                 let mut title = unescape_unicode(&content.title);
 
                 // If title is empty, fetch the actual title from the individual novel
-                if title.trim().is_empty() {
-                    if let Ok(novel_body) = self
+                if title.trim().is_empty()
+                    && let Ok(novel_body) = self
                         .make_ajax_request::<NovelBody>(&format!(
                             "https://www.pixiv.net/ajax/novel/{}",
                             content.id
                         ))
                         .await
-                    {
-                        title = unescape_unicode(&novel_body.title);
-                    }
+                {
+                    title = unescape_unicode(&novel_body.title);
                 }
 
                 all_chapters.push(ChapterInfo {

@@ -192,20 +192,20 @@ impl SyosetuScraper {
     /// Finds the next page URL if pagination exists.
     fn find_next_page(&self, doc: &Html) -> Option<String> {
         // Try primary selector
-        if let Some(elem) = doc.select(&self.selectors.next_page_primary).next() {
-            if let Some(href) = elem.value().attr("href") {
-                return Some(href.to_string());
-            }
+        if let Some(elem) = doc.select(&self.selectors.next_page_primary).next()
+            && let Some(href) = elem.value().attr("href")
+        {
+            return Some(href.to_string());
         }
 
         // Fallback: look for link with text containing "次へ" (next)
         let link_selector = Selector::parse("a").unwrap();
         for elem in doc.select(&link_selector) {
             let text = elem.text().collect::<String>();
-            if text.contains("次へ") || text.contains("次ページ") {
-                if let Some(href) = elem.value().attr("href") {
-                    return Some(href.to_string());
-                }
+            if (text.contains("次へ") || text.contains("次ページ"))
+                && let Some(href) = elem.value().attr("href")
+            {
+                return Some(href.to_string());
             }
         }
 
@@ -252,24 +252,21 @@ fn extract_text_without_ruby(elem: scraper::ElementRef) -> String {
     let mut text = String::new();
 
     for node in elem.descendants() {
-        match node.value() {
-            scraper::node::Node::Text(t) => {
-                // Check if this text is inside an <rt> element
-                let mut is_in_rt = false;
-                for ancestor in node.ancestors() {
-                    if let Some(elem) = ancestor.value().as_element() {
-                        if elem.name() == "rt" {
-                            is_in_rt = true;
-                            break;
-                        }
-                    }
-                }
-
-                if !is_in_rt {
-                    text.push_str(t);
+        if let scraper::node::Node::Text(t) = node.value() {
+            // Check if this text is inside an <rt> element
+            let mut is_in_rt = false;
+            for ancestor in node.ancestors() {
+                if let Some(elem) = ancestor.value().as_element()
+                    && elem.name() == "rt"
+                {
+                    is_in_rt = true;
+                    break;
                 }
             }
-            _ => {}
+
+            if !is_in_rt {
+                text.push_str(t);
+            }
         }
     }
 
@@ -282,13 +279,11 @@ fn resolve_url(base: &str, relative: &str) -> String {
         return relative.to_string();
     }
 
-    if relative.starts_with('/') {
-        // Absolute path - need to get the origin
-        if let Ok(base_url) = url::Url::parse(base) {
-            if let Ok(resolved) = base_url.join(relative) {
-                return resolved.to_string();
-            }
-        }
+    if relative.starts_with('/')
+        && let Ok(base_url) = url::Url::parse(base)
+        && let Ok(resolved) = base_url.join(relative)
+    {
+        return resolved.to_string();
     }
 
     // Simple join for relative paths
