@@ -12,6 +12,7 @@ pub mod name_mapping;
 pub mod name_scout;
 pub mod scrapers;
 pub mod translator;
+pub mod utils;
 
 // Re-export commonly used types
 pub use config::Config;

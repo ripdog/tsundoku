@@ -188,29 +188,7 @@ impl NameScout {
     /// Split text into chunks for processing.
     fn split_into_chunks(&self, text: &str) -> Vec<String> {
         let chunk_size = self.scout_config.chunk_size_chars;
-        let lines: Vec<&str> = text.lines().collect();
-        let mut chunks: Vec<String> = Vec::new();
-        let mut current_chunk: Vec<&str> = Vec::new();
-        let mut current_size: usize = 0;
-
-        for line in lines {
-            let line_size = line.len() + if current_chunk.is_empty() { 0 } else { 1 };
-
-            if current_size + line_size > chunk_size && !current_chunk.is_empty() {
-                chunks.push(current_chunk.join("\n"));
-                current_chunk = vec![line];
-                current_size = line.len();
-            } else {
-                current_chunk.push(line);
-                current_size += line_size;
-            }
-        }
-
-        if !current_chunk.is_empty() {
-            chunks.push(current_chunk.join("\n"));
-        }
-
-        chunks
+        crate::utils::split_text_into_line_chunks(text, chunk_size)
     }
 
     /// Call the LLM model to extract names.
@@ -248,14 +226,7 @@ impl NameScout {
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let text = response.text().await.unwrap_or_default();
-            return Err(TranslationError::ApiError(format!(
-                "HTTP {}: {}",
-                status, text
-            )));
-        }
+        let response = crate::utils::check_response_status(response).await?;
 
         let response_body: ChatResponse = response.json().await.map_err(|e| {
             TranslationError::ParseError(format!("Failed to parse API response: {}", e))

@@ -237,29 +237,7 @@ impl Translator {
         let chunk_size = self.translation_config.chunk_size_chars;
 
         // Phase 1: Line-based chunking
-        let lines: Vec<&str> = text.lines().collect();
-        let mut chunks: Vec<String> = Vec::new();
-        let mut current_chunk: Vec<&str> = Vec::new();
-        let mut current_size: usize = 0;
-
-        for line in lines {
-            let line_size = line.len() + if current_chunk.is_empty() { 0 } else { 1 };
-
-            if current_size + line_size > chunk_size && !current_chunk.is_empty() {
-                // Push current chunk and start new one
-                chunks.push(current_chunk.join("\n"));
-                current_chunk = vec![line];
-                current_size = line.len();
-            } else {
-                current_chunk.push(line);
-                current_size += line_size;
-            }
-        }
-
-        // Don't forget the last chunk
-        if !current_chunk.is_empty() {
-            chunks.push(current_chunk.join("\n"));
-        }
+        let chunks = crate::utils::split_text_into_line_chunks(text, chunk_size);
 
         // Phase 2: Word-based splitting for oversized chunks
         let mut final_chunks: Vec<String> = Vec::new();
@@ -327,14 +305,7 @@ impl Translator {
             .send()
             .await?;
 
-        if !response.status().is_success() {
-            let status = response.status();
-            let text = response.text().await.unwrap_or_default();
-            return Err(TranslationError::ApiError(format!(
-                "HTTP {}: {}",
-                status, text
-            )));
-        }
+        let response = crate::utils::check_response_status(response).await?;
 
         // Stream and accumulate response
         let mut full_response = String::new();
