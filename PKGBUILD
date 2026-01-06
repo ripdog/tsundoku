@@ -9,7 +9,7 @@ license=('GPL-3.0-or-later')
 depends=('gcc-libs')
 makedepends=('rust' 'cargo')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/ripdog/tsundoku/archive/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('99d639a149bfc2273a6c6bdee762bc0296e2a97c8672e0fce9fcf1ec70b7ff37')
 
 prepare() {
     cd "$pkgname-$pkgver"
