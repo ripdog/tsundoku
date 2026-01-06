@@ -181,6 +181,11 @@ pub struct PathsConfig {
 
     /// Directory for name mapping cache.
     pub names_directory: Option<PathBuf>,
+
+    /// Command to open editor for reviewing name mappings.
+    /// If not set, will try to auto-detect a suitable editor.
+    /// Examples: "kate", "vim", "nano", "code", "notepad"
+    pub editor_command: Option<String>,
 }
 
 impl Default for PathsConfig {
@@ -188,6 +193,7 @@ impl Default for PathsConfig {
         Self {
             output_directory: PathBuf::from("."),
             names_directory: None,
+            editor_command: None,
         }
     }
 }

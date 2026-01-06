@@ -51,6 +51,7 @@ struct ProcessParams<'a> {
     name_scout: &'a NameScout,
     name_mapping: &'a mut NameMappingStore,
     no_name_pause: bool,
+    config: &'a Config,
 }
 
 #[tokio::main]
@@ -158,6 +159,7 @@ async fn main() -> Result<()> {
         name_scout: &name_scout,
         name_mapping: &mut name_mapping,
         no_name_pause: args.no_name_pause,
+        config: &config,
     };
 
     // Process based on chapter type
@@ -219,7 +221,7 @@ async fn process_oneshot(params: &mut ProcessParams<'_>) -> Result<()> {
 
     // Manual review (only if scouting was performed)
     if !params.no_name_pause && scouted {
-        manual_name_review(params.console, params.name_mapping)?;
+        manual_name_review(params.console, params.name_mapping, params.config)?;
     }
 
     // Translate content
@@ -341,7 +343,7 @@ async fn process_chapters(
 
     // Manual review (only if scouting was performed)
     if !params.no_name_pause && scouted {
-        manual_name_review(params.console, params.name_mapping)?;
+        manual_name_review(params.console, params.name_mapping, params.config)?;
     }
 
     // Translation phase
@@ -466,18 +468,61 @@ async fn run_name_scout(
 }
 
 /// Prompts user to review and edit name mappings.
-fn manual_name_review(console: &Console, name_mapping: &mut NameMappingStore) -> Result<()> {
+fn manual_name_review(
+    console: &Console,
+    name_mapping: &mut NameMappingStore,
+    config: &Config,
+) -> Result<()> {
     console.section("Name Mapping Review");
 
     let filepath = name_mapping.filepath();
     console.info(&format!("Name mapping file: {}", filepath.display()));
 
-    // Try to open in editor (optional)
-    if let Ok(editor) = which::which("kate") {
-        console.info("Opening in Kate editor...");
-        let _ = std::process::Command::new(editor)
-            .arg(filepath)
-            .spawn();
+    // Try to open in editor
+    let editor_opened = if let Some(ref editor_cmd) = config.paths.editor_command {
+        // Use configured editor
+        match std::process::Command::new(editor_cmd).arg(filepath).spawn() {
+            Ok(_) => {
+                console.info(&format!("Opening in {}...", editor_cmd));
+                true
+            }
+            Err(e) => {
+                console.warning(&format!("Failed to launch {}: {}", editor_cmd, e));
+                false
+            }
+        }
+    } else {
+        // Auto-detect editor
+        let editors = if cfg!(target_os = "windows") {
+            vec!["notepad", "code", "notepad++"]
+        } else if cfg!(target_os = "macos") {
+            vec!["open", "code", "vim", "nano"]
+        } else {
+            // Linux and other Unix-like systems
+            vec!["kate", "gedit", "code", "vim", "nano", "emacs"]
+        };
+
+        let mut opened = false;
+        for editor in editors {
+            if let Ok(editor_path) = which::which(editor) {
+                match std::process::Command::new(&editor_path).arg(filepath).spawn() {
+                    Ok(_) => {
+                        console.info(&format!("Opening in {}...", editor));
+                        opened = true;
+                        break;
+                    }
+                    Err(_) => continue,
+                }
+            }
+        }
+        opened
+    };
+
+    if !editor_opened {
+        console.info(&format!(
+            "Could not auto-detect editor. Please open the file manually: {}",
+            filepath.display()
+        ));
     }
 
     // Prompt user

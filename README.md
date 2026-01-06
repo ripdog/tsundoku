@@ -39,9 +39,9 @@ cargo install --path .
 
 On first run, Tsundoku will create a default configuration file:
 
-- Linux: `~/.config/Tsundoku/config.ini`
-- macOS: `~/Library/Application Support/Tsundoku/config.ini`
-- Windows: `%APPDATA%\Tsundoku\config.ini`
+- Linux: `~/.config/Tsundoku/config.toml`
+- macOS: `~/Library/Application Support/Tsundoku/config.toml`
+- Windows: `%APPDATA%\Tsundoku\config.toml`
 
 Edit the configuration file to add your OpenAI-compatible API key and customize settings.
 
@@ -49,23 +49,36 @@ Edit the configuration file to add your OpenAI-compatible API key and customize 
 
 At minimum, you must set your API key:
 
-```ini
-[API]
-key = your_api_key_here
-base_url = https://api.openai.com/v1
-model = gpt-4o-mini
+```toml
+[api]
+key = "your_api_key_here"
+base_url = "https://api.openai.com/v1"
+model = "gpt-4o-mini"
 ```
 
-### Optional: Separate Scout API
+### Optional Configuration
+
+#### Separate Scout API
 
 You can use a different (cheaper) model for character name extraction:
 
-```ini
-[ScoutAPI]
-key = your_scout_api_key
-base_url = https://api.openai.com/v1
-model = gpt-4o-mini
+```toml
+[scout_api]
+key = "your_scout_api_key"
+base_url = "https://api.openai.com/v1"
+model = "gpt-4o-mini"
 ```
+
+#### Editor for Name Review
+
+Specify which editor to use when reviewing name mappings:
+
+```toml
+[paths]
+editor_command = "kate"  # or "vim", "nano", "code", "notepad", etc.
+```
+
+If not specified, Tsundoku will auto-detect a suitable editor based on your platform.
 
 ## Usage
 
@@ -102,6 +115,23 @@ tsundoku --no-name-pause https://kakuyomu.jp/works/1234567890
 3. **Review** (optional): Pause to let you manually review/edit name mappings
 4. **Translate**: Applies name mappings and translates content using LLM
 5. **Save**: Stores translated chapters as text files
+
+### Resume Capability
+
+Tsundoku is fully resumable at every stage:
+
+- **Already downloaded chapters are skipped** - Original text files are checked before downloading
+- **Already translated chapters are skipped** - Translated files are checked before translation
+- **Name scouting tracks coverage** - Chapters that have been scanned for names won't be scanned again
+- **Progress is saved incrementally** - Name mappings are saved after each successful API call
+
+This means you can:
+- Stop and restart the program at any time
+- Re-run the same command to continue where you left off
+- Add new chapters to an existing series by running with a wider `--end` range
+- Retry failed translations without redoing successful ones
+
+Simply run the same command again, and Tsundoku will intelligently skip completed work.
 
 ### Output Structure
 
