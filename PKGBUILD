@@ -1,14 +1,14 @@
 # Maintainer: ripdog <ripdog@users.noreply.github.com>
 pkgname=tsundoku
-pkgver=0.1.0
+pkgver=1.0.0
 pkgrel=1
 pkgdesc="Japanese web novel downloader and translator supporting Syosetu, Kakuyomu, and Pixiv"
 arch=('x86_64' 'aarch64')
-url="https://github.com/ripdog/Tsundoku"
+url="https://github.com/ripdog/tsundoku"
 license=('GPL-3.0-or-later')
 depends=('gcc-libs')
 makedepends=('rust' 'cargo')
-source=("$pkgname-$pkgver.tar.gz::https://github.com/ripdog/Tsundoku/archive/v$pkgver.tar.gz")
+source=("$pkgname-$pkgver.tar.gz::https://github.com/ripdog/tsundoku/archive/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 
 prepare() {
