@@ -16,6 +16,16 @@ A Japanese web novel downloader and translator supporting Syosetu, Kakuyomu, and
 
 ## Installation
 
+### Pre-built Binaries
+
+Download the latest release for your platform from the [Releases page](https://github.com/ripdog/tsundoku/releases):
+
+- **Linux**: `tsundoku-linux-x86_64.tar.gz` (glibc) or `tsundoku-linux-x86_64-musl.tar.gz` (musl)
+- **macOS**: `tsundoku-macos-x86_64.tar.gz` (Intel) or `tsundoku-macos-aarch64.tar.gz` (Apple Silicon)
+- **Windows**: `tsundoku-windows-x86_64.exe.zip`
+
+Extract and run the binary, or move it to a directory in your PATH.
+
 ### From AUR (Arch Linux)
 
 ```bash
@@ -26,7 +36,7 @@ paru -S tsundoku
 
 ### From Source
 
-Requires Rust 1.80+ (edition 2024 support)
+Requires Rust 1.92+ (edition 2024 support)
 
 ```bash
 git clone https://github.com/ripdog/Tsundoku.git
@@ -200,6 +210,21 @@ cargo test
 ```bash
 cargo run -- https://ncode.syosetu.com/n1234ab/
 ```
+
+### Creating a Release
+
+To create a new release:
+
+1. Update version in `Cargo.toml`
+2. Run `cargo build` to update `Cargo.lock`
+3. Commit the changes: `git commit -am "Bump version to X.Y.Z"`
+4. Create and push a tag: `git tag vX.Y.Z && git push origin vX.Y.Z`
+
+The GitHub Actions workflow will automatically:
+- Create a GitHub release
+- Build and upload cross-platform binaries
+- Build the Arch Linux package with updated PKGBUILD
+- Update the PKGBUILD in the repository with the new version and checksum
 
 ## License
 
