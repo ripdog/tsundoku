@@ -63,7 +63,7 @@ jobs:
             --exclude='.git' --exclude='target' --exclude='*.tar.gz' \
             --exclude='.idea' --exclude='logs' --exclude='.ruff_cache' \
             --exclude='.github' \
-            ./src ./Cargo.toml ./Cargo.lock ./rust-toolchain.toml ./LICENSE ./README.md ./SPECIFICATION.md ./AGENTS.md
+            ./src ./Cargo.toml ./Cargo.lock ./LICENSE ./README.md ./SPECIFICATION.md ./AGENTS.md
 
       - name: Calculate checksum
         id: checksum
