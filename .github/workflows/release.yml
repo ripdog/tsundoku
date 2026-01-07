@@ -84,7 +84,20 @@ jobs:
 
       - name: Build package
         run: |
-          su - builder -c "cd $(pwd) && makepkg --cleanbuild"
+          mkdir -p build-arch
+          cp PKGBUILD build-arch/
+          cp "tsundoku-${{ steps.get_version.outputs.version }}.tar.gz" build-arch/
+          chown -R builder:builder build-arch
+          
+          # Debug: Show structure before build
+          ls -R build-arch
+          
+          # Build in the clean directory
+          su - builder -c "cd $(pwd)/build-arch && makepkg --printsrcinfo"
+          su - builder -c "cd $(pwd)/build-arch && makepkg"
+          
+          # Move the built package back to root for the next step
+          mv build-arch/tsundoku-*.pkg.tar.zst .
 
       - name: Get package filename
         id: package
