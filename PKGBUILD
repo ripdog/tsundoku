@@ -8,7 +8,7 @@ url="https://github.com/ripdog/tsundoku"
 license=('GPL-3.0-or-later')
 depends=('gcc-libs')
 makedepends=('rust' 'cargo' 'cmake')
-source=("$pkgname-$pkgver.tar.gz::https://github.com/ripdog/tsundoku/archive/v$pkgver.tar.gz")
+source=("$pkgname-$pkgver.tar.gz::https://github.com/ripdog/tsundoku/releases/download/v$pkgver/tsundoku-$pkgver.tar.gz")
 sha256sums=('8e5c5c7fd36979af6fa727698f10f1b2e7776fbb50c49425cb205f7a5860cebe')
 
 prepare() {

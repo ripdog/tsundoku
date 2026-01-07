@@ -58,12 +58,19 @@ jobs:
 
       - name: Create source tarball
         run: |
-          tar -czf tsundoku-${{ steps.get_version.outputs.version }}.tar.gz \
-            --transform "s,^\.,tsundoku-${{ steps.get_version.outputs.version }}," \
-            --exclude='.git' --exclude='target' --exclude='*.tar.gz' \
-            --exclude='.idea' --exclude='logs' --exclude='.ruff_cache' \
-            --exclude='.github' \
-            ./src ./Cargo.toml ./Cargo.lock ./LICENSE ./README.md ./SPECIFICATION.md ./AGENTS.md
+          # Create a temporary directory for the tarball content
+          PKG_NAME="tsundoku-${{ steps.get_version.outputs.version }}"
+          mkdir "$PKG_NAME"
+          
+          # Copy files to the directory
+          cp -r src "$PKG_NAME/"
+          cp Cargo.toml Cargo.lock LICENSE README.md SPECIFICATION.md AGENTS.md "$PKG_NAME/"
+          
+          # Create the tarball from the directory
+          tar -czf "$PKG_NAME.tar.gz" "$PKG_NAME"
+          
+          # Cleanup
+          rm -rf "$PKG_NAME"
 
       - name: Calculate checksum
         id: checksum
