@@ -4,6 +4,12 @@
 
 Tsundoku is a Japanese web novel downloader and translator. It scrapes content from Syosetu, Kakuyomu, and Pixiv, extracts character names, and translates content using OpenAI-compatible APIs.
 
+## CRITICAL: Rust Edition
+
+**DO NOT CHANGE THE RUST EDITION IN Cargo.toml**
+
+This project uses `edition = "2024"`. Do NOT change it to 2021 or any other edition. Rust 2024 edition is current and valid.
+
 ## Code Quality Principles
 
 ### Error Handling
