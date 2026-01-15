@@ -2,7 +2,7 @@
 //!
 //! Supports downloading novels from Kadokawa's Kakuyomu platform.
 
-use super::{create_http_client, rate_limit, ChapterInfo, ChapterList, NovelInfo, Scraper};
+use super::{ChapterInfo, ChapterList, NovelInfo, Scraper, create_http_client, rate_limit};
 use crate::config::ScrapingConfig;
 use crate::error::ScraperError;
 use async_trait::async_trait;
@@ -19,8 +19,7 @@ static URL_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
 });
 
 /// Regex to extract work ID from URL.
-static WORK_ID_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"/works/(\d+)").unwrap());
+static WORK_ID_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"/works/(\d+)").unwrap());
 
 /// Regex to strip episode suffix from URLs.
 static EPISODE_SUFFIX_REGEX: LazyLock<Regex> =

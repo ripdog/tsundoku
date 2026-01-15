@@ -269,14 +269,13 @@ impl NameScout {
             _ => {
                 return Err(TranslationError::ParseError(
                     "No valid JSON object found".to_string(),
-                ))
+                ));
             }
         };
 
         // Parse JSON
-        let parsed: ParsedNamesResponse = serde_json::from_str(json_content).map_err(|e| {
-            TranslationError::ParseError(format!("JSON parse error: {}", e))
-        })?;
+        let parsed: ParsedNamesResponse = serde_json::from_str(json_content)
+            .map_err(|e| TranslationError::ParseError(format!("JSON parse error: {}", e)))?;
 
         // Convert to NameEntry
         let entries: Vec<NameEntry> = parsed
@@ -417,7 +416,10 @@ I hope this helps!"#;
     #[test]
     fn test_build_chapter_payload() {
         let payload = build_chapter_payload(5, "The Beginning", "Once upon a time...");
-        assert_eq!(payload, "### Chapter 5 - The Beginning\nOnce upon a time...");
+        assert_eq!(
+            payload,
+            "### Chapter 5 - The Beginning\nOnce upon a time..."
+        );
     }
 
     use crate::config::ApiConfig;

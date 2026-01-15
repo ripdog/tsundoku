@@ -65,7 +65,6 @@ pub async fn check_response_status(
     Ok(response)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

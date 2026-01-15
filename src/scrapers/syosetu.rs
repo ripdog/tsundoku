@@ -2,7 +2,7 @@
 //!
 //! Supports both general audience and 18+ content from the Syosetu platform.
 
-use super::{create_http_client, rate_limit, ChapterInfo, ChapterList, NovelInfo, Scraper};
+use super::{ChapterInfo, ChapterList, NovelInfo, Scraper, create_http_client, rate_limit};
 use crate::config::ScrapingConfig;
 use crate::error::ScraperError;
 use async_trait::async_trait;
@@ -157,7 +157,10 @@ impl SyosetuScraper {
     /// Checks if the page contains one-shot content (story on main page).
     fn is_oneshot(&self, doc: &Html) -> bool {
         doc.select(&self.selectors.content_primary).next().is_some()
-            || doc.select(&self.selectors.content_fallback).next().is_some()
+            || doc
+                .select(&self.selectors.content_fallback)
+                .next()
+                .is_some()
     }
 
     /// Extracts chapter links from a page.
@@ -432,7 +435,10 @@ mod tests {
             "https://ncode.syosetu.com/n1234ab/2/"
         );
         assert_eq!(
-            resolve_url("https://ncode.syosetu.com/n1234ab/", "https://other.com/page"),
+            resolve_url(
+                "https://ncode.syosetu.com/n1234ab/",
+                "https://other.com/page"
+            ),
             "https://other.com/page"
         );
     }

@@ -3,7 +3,7 @@
 //! Supports downloading novels from Pixiv's novel section, including
 //! both individual novels and series.
 
-use super::{rate_limit, ChapterInfo, ChapterList, NovelInfo, Scraper};
+use super::{ChapterInfo, ChapterList, NovelInfo, Scraper, rate_limit};
 use crate::config::ScrapingConfig;
 use crate::error::ScraperError;
 use async_trait::async_trait;
@@ -13,9 +13,8 @@ use serde::Deserialize;
 use std::sync::LazyLock;
 
 /// Regex for individual novel URLs.
-static INDIVIDUAL_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"https?://www\.pixiv\.net/novel/show\.php\?id=(\d+)").unwrap()
-});
+static INDIVIDUAL_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"https?://www\.pixiv\.net/novel/show\.php\?id=(\d+)").unwrap());
 
 /// Regex for series URLs.
 static SERIES_PATTERN: LazyLock<Regex> =
@@ -96,10 +95,22 @@ impl PixivScraper {
     /// Creates a new Pixiv scraper with the given configuration.
     pub fn new(config: ScrapingConfig) -> Self {
         let mut headers = HeaderMap::new();
-        headers.insert("Accept", HeaderValue::from_static("application/json, text/javascript, */*; q=0.01"));
-        headers.insert("Accept-Language", HeaderValue::from_static("en-US,en;q=0.9"));
-        headers.insert("Referer", HeaderValue::from_static("https://www.pixiv.net/"));
-        headers.insert("X-Requested-With", HeaderValue::from_static("XMLHttpRequest"));
+        headers.insert(
+            "Accept",
+            HeaderValue::from_static("application/json, text/javascript, */*; q=0.01"),
+        );
+        headers.insert(
+            "Accept-Language",
+            HeaderValue::from_static("en-US,en;q=0.9"),
+        );
+        headers.insert(
+            "Referer",
+            HeaderValue::from_static("https://www.pixiv.net/"),
+        );
+        headers.insert(
+            "X-Requested-With",
+            HeaderValue::from_static("XMLHttpRequest"),
+        );
 
         let client = reqwest::Client::builder()
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
@@ -162,9 +173,9 @@ impl PixivScraper {
             )));
         }
 
-        api_response.body.ok_or_else(|| {
-            ScraperError::ParseError("API response missing body".to_string())
-        })
+        api_response
+            .body
+            .ok_or_else(|| ScraperError::ParseError("API response missing body".to_string()))
     }
 
     /// Gets all chapters in a series with pagination.
@@ -274,8 +285,8 @@ impl Scraper for PixivScraper {
     }
 
     async fn get_novel_info(&self, url: &str) -> Result<NovelInfo, ScraperError> {
-        let url_type = Self::parse_url(url)
-            .ok_or_else(|| ScraperError::UnsupportedUrl(url.to_string()))?;
+        let url_type =
+            Self::parse_url(url).ok_or_else(|| ScraperError::UnsupportedUrl(url.to_string()))?;
 
         match url_type {
             PixivUrlType::Individual(novel_id) => {
@@ -325,9 +336,7 @@ impl Scraper for PixivScraper {
                 .captures(chapter_url)
                 .and_then(|caps| caps.get(1))
                 .map(|m| m.as_str().to_string())
-                .ok_or_else(|| {
-                    ScraperError::InvalidUrl("Could not extract novel ID".to_string())
-                })?
+                .ok_or_else(|| ScraperError::InvalidUrl("Could not extract novel ID".to_string()))?
         } else {
             // Already an ID
             chapter_url.to_string()
