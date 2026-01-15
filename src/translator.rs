@@ -154,7 +154,8 @@ impl Translator {
             } else {
                 text.to_string()
             };
-            self.console.info(&format!("Translating title 「{}」", snippet));
+            self.console
+                .info(&format!("Translating title 「{}」", snippet));
 
             let mut history = vec![Message {
                 role: "system".to_string(),
@@ -208,7 +209,9 @@ impl Translator {
                                 let delay = Duration::from_secs(2u64.pow(attempt));
                                 self.console.warning(&format!(
                                     "Translation failed, retrying in {:?} (attempt {}/{})",
-                                    delay, attempt + 1, self.translation_config.retries
+                                    delay,
+                                    attempt + 1,
+                                    self.translation_config.retries
                                 ));
                                 tokio::time::sleep(delay).await;
                             }
@@ -515,12 +518,8 @@ mod tests {
             ..Default::default()
         };
 
-        let translator = Translator::new(
-            ApiConfig::default(),
-            config,
-            String::new(),
-            String::new(),
-        );
+        let translator =
+            Translator::new(ApiConfig::default(), config, String::new(), String::new());
 
         let text = "Line one here\nLine two here\nLine three here";
         let chunks = translator.split_text_into_chunks(text);
@@ -591,25 +590,25 @@ mod tests {
         // This test verifies that title truncation handles UTF-8 characters correctly
         // The panic was: "byte index 30 is not a char boundary; it is inside 'の' (bytes 29..32)"
         // This happened because the old code checked text.len() (bytes) but sliced assuming ASCII
-        
+
         // Japanese text with multi-byte characters
         // This specific title: "３２．KeisukeとRika、恋の行方"
         // Has 20 characters but 38 bytes (some chars are 3 bytes each)
         let title = "３２．KeisukeとRika、恋の行方";
-        
+
         let char_count = title.chars().count();
         let byte_count = title.len();
-        
+
         // This title has more BYTES than 30, but fewer CHARACTERS
         assert_eq!(char_count, 20);
         assert!(byte_count > 30, "Title byte length: {}", byte_count);
-        
+
         // The OLD buggy code would do:
         // if text.len() > 30 { &text[..30] }  <- PANIC! Slices at byte 30 (inside 'の')
         //
         // The NEW fixed code does:
         // if text.chars().count() > 30 { text.chars().take(30).collect() }  <- OK!
-        
+
         // Since this title has only 20 chars, the fixed code won't truncate it
         let snippet = if title.chars().count() > 30 {
             let truncated: String = title.chars().take(30).collect();
@@ -617,22 +616,23 @@ mod tests {
         } else {
             title.to_string()
         };
-        
+
         // Should NOT be truncated (only 20 chars)
         assert_eq!(snippet, title);
         assert!(!snippet.ends_with("..."));
-        
+
         // Now test with a title that's actually longer than 30 characters
-        let long_title = "これは非常に長いタイトルでテストのために使用されます。三十文字以上あります。";
+        let long_title =
+            "これは非常に長いタイトルでテストのために使用されます。三十文字以上あります。";
         assert!(long_title.chars().count() > 30);
-        
+
         let snippet_long = if long_title.chars().count() > 30 {
             let truncated: String = long_title.chars().take(30).collect();
             format!("{}...", truncated)
         } else {
             long_title.to_string()
         };
-        
+
         assert!(snippet_long.ends_with("..."));
         assert_eq!(snippet_long.chars().count(), 33); // 30 chars + "..."
     }
