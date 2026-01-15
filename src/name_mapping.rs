@@ -28,6 +28,45 @@ const ENGLISH_HONORIFICS: &[&str] = &[
     "-san", "-chan", "-kun", "-sama", " san", " chan", " kun", " sama",
 ];
 
+/// Words that the name scout tends to incorrectly label as character names.
+///
+/// This is intentionally a simple denylist (exact match) so we don't accidentally
+/// filter out legitimate names.
+const ORIGINAL_NAME_DENYLIST: &[&str] = &[
+    // Common Japanese pronouns / self-references
+    "彼",
+    "彼女",
+    "あいつ",
+    "こいつ",
+    "そいつ",
+    "こちとら",
+    "こちら",
+    "自分",
+    "私",
+    "わたし",
+    "わたくし",
+    "俺",
+    "おれ",
+    "僕",
+    "ぼく",
+    "うち",
+    "あなた",
+    "君",
+    "きみ",
+    "お前",
+    "おまえ",
+    "貴様",
+    // Plurals and groups
+    "彼ら",
+    "彼女ら",
+    "俺たち",
+    "僕ら",
+    "私たち",
+    "あなたたち",
+    "皆",
+    "みんな",
+];
+
 /// Indicates what part of a name this is (family name, given name, or unknown).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -203,6 +242,11 @@ impl NameMappingStore {
                 continue;
             }
 
+            // Skip if original is in denylist (e.g. pronouns)
+            if ORIGINAL_NAME_DENYLIST.contains(&entry.original.as_str()) {
+                continue;
+            }
+
             // Skip if english contains whitespace
             if entry.english.chars().any(|c| c.is_whitespace()) {
                 continue;
@@ -249,6 +293,11 @@ impl NameMappingStore {
 
             // Check original for honorific suffix
             if HONORIFIC_SUFFIX_REGEX.is_match(original) {
+                return false;
+            }
+
+            // Reject if original is in denylist (e.g. pronouns)
+            if ORIGINAL_NAME_DENYLIST.contains(&original.as_str()) {
                 return false;
             }
 
@@ -474,6 +523,27 @@ mod tests {
             english: "Tanaka San".to_string(), // Contains space
             part: NamePart::Family,
         }]);
+
+        assert!(store.is_empty());
+    }
+
+    #[test]
+    fn test_original_denylist_rejected() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut store = NameMappingStore::new(temp_dir.path(), "syosetu", "n1234ab").unwrap();
+
+        store.record_votes(&[
+            NameEntry {
+                original: "彼女".to_string(),
+                english: "Kanojo".to_string(),
+                part: NamePart::Unknown,
+            },
+            NameEntry {
+                original: "俺".to_string(),
+                english: "Ore".to_string(),
+                part: NamePart::Unknown,
+            },
+        ]);
 
         assert!(store.is_empty());
     }
