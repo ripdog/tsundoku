@@ -74,15 +74,20 @@ struct SeriesPage {
     series_contents: Vec<SeriesContent>,
 }
 
+/// Series metadata for ordering.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SeriesMetadata {
+    content_order: u32,
+}
+
 /// Individual content in a series.
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 struct SeriesContent {
     id: String,
     title: String,
-    order: u32,
-    #[serde(default)]
-    available: bool,
+    series: SeriesMetadata,
 }
 
 /// Pixiv scraper for pixiv.net/novel.
@@ -100,6 +105,10 @@ impl PixivScraper {
             HeaderValue::from_static("application/json, text/javascript, */*; q=0.01"),
         );
         headers.insert(
+            "Accept-Encoding",
+            HeaderValue::from_static("gzip, deflate, br"),
+        );
+        headers.insert(
             "Accept-Language",
             HeaderValue::from_static("en-US,en;q=0.9"),
         );
@@ -115,6 +124,7 @@ impl PixivScraper {
         let client = reqwest::Client::builder()
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .default_headers(headers)
+            .cookie_store(true)
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("Failed to create HTTP client");
@@ -227,7 +237,7 @@ impl PixivScraper {
                 all_chapters.push(ChapterInfo {
                     title,
                     url: content.id.clone(), // Store ID as URL for later retrieval
-                    number: content.order,
+                    number: content.series.content_order,
                 });
             }
 
@@ -237,7 +247,10 @@ impl PixivScraper {
             }
 
             // Update last_order for next page
-            last_order = contents.last().map(|c| c.order).unwrap_or(last_order);
+            last_order = contents
+                .last()
+                .map(|c| c.series.content_order)
+                .unwrap_or(last_order);
         }
 
         // Sort by order to ensure correct sequence
