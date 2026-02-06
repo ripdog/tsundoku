@@ -10,6 +10,7 @@ use async_trait::async_trait;
 use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderValue};
 use serde::Deserialize;
+use serde_json::Value as JsonValue;
 use std::sync::LazyLock;
 
 /// Regex for individual novel URLs.
@@ -86,7 +87,7 @@ struct SeriesMetadata {
 #[allow(dead_code)]
 struct SeriesContent {
     id: String,
-    title: String,
+    title: Option<String>,
     series: SeriesMetadata,
 }
 
@@ -151,28 +152,72 @@ impl PixivScraper {
         rate_limit(self.config.delay_between_requests_sec).await;
 
         let response = self.client.get(url).send().await?;
+        let status = response.status();
+        let headers = response.headers().clone();
 
-        if !response.status().is_success() {
+        if !status.is_success() {
+            if self.config.debug {
+                eprintln!(
+                    "[Pixiv Debug] Non-success response: url={} status={}",
+                    url,
+                    status.as_u16()
+                );
+            }
             return Err(ScraperError::HttpError(
                 response.error_for_status().unwrap_err(),
             ));
         }
 
         // Check content type
-        let content_type = response
-            .headers()
+        let content_type = headers
             .get("content-type")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
+        let content_encoding = headers
+            .get("content-encoding")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("(none)");
+
+        let body_bytes = response.bytes().await.map_err(|e| {
+            if self.config.debug {
+                log_decode_failure(url, status.as_u16(), content_type, content_encoding, &[]);
+            }
+            ScraperError::ParseError(format!("Failed to read response body: {}", e))
+        })?;
+
+        if self.config.debug {
+            if let Ok(json_value) = serde_json::from_slice::<JsonValue>(&body_bytes) {
+                eprintln!("[Pixiv Debug] JSON key dump for {}", url);
+                dump_json_keys(&json_value, "root");
+            }
+        }
 
         if !content_type.contains("application/json") {
+            if self.config.debug {
+                log_decode_failure(
+                    url,
+                    status.as_u16(),
+                    content_type,
+                    content_encoding,
+                    &body_bytes,
+                );
+            }
             return Err(ScraperError::ParseError(format!(
                 "Expected JSON but got: {}",
                 content_type
             )));
         }
 
-        let api_response: ApiResponse<T> = response.json().await.map_err(|e| {
+        let api_response: ApiResponse<T> = serde_json::from_slice(&body_bytes).map_err(|e| {
+            if self.config.debug {
+                log_decode_failure(
+                    url,
+                    status.as_u16(),
+                    content_type,
+                    content_encoding,
+                    &body_bytes,
+                );
+            }
             ScraperError::ParseError(format!("Failed to parse API response: {}", e))
         })?;
 
@@ -220,19 +265,17 @@ impl PixivScraper {
             }
 
             for content in &contents {
-                let mut title = unescape_unicode(&content.title);
-
-                // If title is empty, fetch the actual title from the individual novel
-                if title.trim().is_empty()
-                    && let Ok(novel_body) = self
-                        .make_ajax_request::<NovelBody>(&format!(
-                            "https://www.pixiv.net/ajax/novel/{}",
-                            content.id
-                        ))
-                        .await
-                {
-                    title = unescape_unicode(&novel_body.title);
-                }
+                let title = content
+                    .title
+                    .as_deref()
+                    .unwrap_or("")
+                    .trim()
+                    .to_string();
+                let title = if title.is_empty() {
+                    format!("Chapter {}", content.series.content_order)
+                } else {
+                    unescape_unicode(&title)
+                };
 
                 all_chapters.push(ChapterInfo {
                     title,
@@ -262,6 +305,67 @@ impl PixivScraper {
         }
 
         Ok(all_chapters)
+    }
+}
+
+fn log_decode_failure(
+    url: &str,
+    status: u16,
+    content_type: &str,
+    content_encoding: &str,
+    body: &[u8],
+) {
+    let preview_len = body.len().min(512);
+    let preview = String::from_utf8_lossy(&body[..preview_len]);
+    let json_hint = serde_json::from_slice::<JsonValue>(body).ok();
+
+    eprintln!("[Pixiv Debug] Failed to decode API response");
+    eprintln!("[Pixiv Debug] URL: {}", url);
+    eprintln!("[Pixiv Debug] Status: {}", status);
+    eprintln!("[Pixiv Debug] Content-Type: {}", content_type);
+    eprintln!("[Pixiv Debug] Content-Encoding: {}", content_encoding);
+    eprintln!("[Pixiv Debug] Body length: {} bytes", body.len());
+    eprintln!("[Pixiv Debug] Body preview: {}", preview);
+
+    if let Some(value) = json_hint {
+        if let Ok(pretty) = serde_json::to_string_pretty(&value) {
+            eprintln!("[Pixiv Debug] Parsed JSON preview: {}", pretty);
+        }
+    }
+}
+
+fn dump_json_keys(value: &JsonValue, path: &str) {
+    match value {
+        JsonValue::Object(map) => {
+            eprintln!("[Pixiv Debug] {}: object ({} keys)", path, map.len());
+            for (key, child) in map {
+                let next_path = format!("{}.{}", path, key);
+                dump_json_keys(child, &next_path);
+            }
+        }
+        JsonValue::Array(items) => {
+            eprintln!("[Pixiv Debug] {}: array ({} items)", path, items.len());
+            for (idx, child) in items.iter().enumerate() {
+                let next_path = format!("{}[{}]", path, idx);
+                dump_json_keys(child, &next_path);
+            }
+        }
+        JsonValue::String(s) => {
+            eprintln!(
+                "[Pixiv Debug] {}: string (len={})",
+                path,
+                s.chars().count()
+            );
+        }
+        JsonValue::Number(_) => {
+            eprintln!("[Pixiv Debug] {}: number", path);
+        }
+        JsonValue::Bool(_) => {
+            eprintln!("[Pixiv Debug] {}: bool", path);
+        }
+        JsonValue::Null => {
+            eprintln!("[Pixiv Debug] {}: null", path);
+        }
     }
 }
 
@@ -356,7 +460,23 @@ impl Scraper for PixivScraper {
         };
 
         let api_url = format!("https://www.pixiv.net/ajax/novel/{}", novel_id);
+        if self.config.debug {
+            eprintln!(
+                "[Pixiv Debug] Downloading chapter: chapter_url={} novel_id={} api_url={}",
+                chapter_url, novel_id, api_url
+            );
+        }
         let body: NovelBody = self.make_ajax_request(&api_url).await?;
+        if self.config.debug {
+            eprintln!(
+                "[Pixiv Debug] Novel body: id={} title={} series_id={} content_present={} content_len={}",
+                body.id,
+                body.title,
+                body.series_id.as_deref().unwrap_or("(none)"),
+                body.content.is_some(),
+                body.content.as_ref().map(|c| c.len()).unwrap_or(0)
+            );
+        }
 
         let content = body
             .content

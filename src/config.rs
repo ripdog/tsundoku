@@ -135,12 +135,15 @@ impl Default for NameScoutConfig {
 pub struct ScrapingConfig {
     /// Delay between web requests in seconds.
     pub delay_between_requests_sec: f64,
+    /// Enable scraper debug logging.
+    pub debug: bool,
 }
 
 impl Default for ScrapingConfig {
     fn default() -> Self {
         Self {
             delay_between_requests_sec: 1.0,
+            debug: false,
         }
     }
 }

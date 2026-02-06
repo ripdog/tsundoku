@@ -30,6 +30,10 @@ struct Args {
     /// Skip manual name mapping review pause.
     #[arg(long)]
     no_name_pause: bool,
+
+    /// Enable debug logging for scrapers.
+    #[arg(long)]
+    debug: bool,
 }
 
 /// Downloaded chapter data.
@@ -63,7 +67,8 @@ async fn main() -> Result<()> {
 
     // Load configuration
     console.step("Loading configuration...");
-    let config = Config::load().context("Failed to load configuration")?;
+    let mut config = Config::load().context("Failed to load configuration")?;
+    config.scraping.debug = args.debug;
 
     // Check if this is first run (API key not configured)
     if !config.api.is_configured() {
