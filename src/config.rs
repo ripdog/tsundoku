@@ -17,13 +17,13 @@ const CONFIG_FILENAME: &str = "config.toml";
 const API_KEY_PLACEHOLDER: &str = "YOUR_API_KEY_HERE";
 
 /// Main configuration structure.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Config {
     /// Main translation API configuration.
     pub api: ApiConfig,
 
-    /// Optional separate API for name scouting.
+    /// Separate API for name scouting.
     pub scout_api: Option<ApiConfig>,
 
     /// Translation behavior settings.
@@ -40,6 +40,20 @@ pub struct Config {
 
     /// File paths.
     pub paths: PathsConfig,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            api: ApiConfig::default(),
+            scout_api: Some(ApiConfig::default()),
+            translation: TranslationConfig::default(),
+            name_scout: NameScoutConfig::default(),
+            scraping: ScrapingConfig::default(),
+            prompts: PromptsConfig::default(),
+            paths: PathsConfig::default(),
+        }
+    }
 }
 
 /// API configuration for LLM endpoints.
@@ -260,10 +274,26 @@ impl Config {
 
     /// Validates the configuration.
     pub fn validate(&self) -> Result<(), ConfigError> {
+        self.validate_with_options(true)
+    }
+
+    /// Validates the configuration with optional name scout requirements.
+    pub fn validate_with_options(&self, require_scout_api: bool) -> Result<(), ConfigError> {
         if !self.api.is_configured() {
             return Err(ConfigError::MissingValue(
                 "api.key (set your API key in config file)".to_string(),
             ));
+        }
+
+        if require_scout_api {
+            match self.scout_api.as_ref().filter(|api| api.is_configured()) {
+                Some(_) => {}
+                None => {
+                    return Err(ConfigError::MissingValue(
+                        "scout_api.key (set your name scout API key in config file)".to_string(),
+                    ));
+                }
+            }
         }
 
         if self.translation.chunk_size_chars == 0 {
@@ -286,12 +316,15 @@ impl Config {
     }
 
     /// Returns the API config to use for name scouting.
-    /// Falls back to main API if scout_api is not configured.
-    pub fn scout_api_config(&self) -> &ApiConfig {
+    pub fn scout_api_config(&self) -> Result<&ApiConfig, ConfigError> {
         self.scout_api
             .as_ref()
             .filter(|api| api.is_configured())
-            .unwrap_or(&self.api)
+            .ok_or_else(|| {
+                ConfigError::MissingValue(
+                    "scout_api.key (set your name scout API key in config file)".to_string(),
+                )
+            })
     }
 }
 
@@ -304,6 +337,8 @@ mod tests {
     fn test_default_config() {
         let config = Config::default();
         assert!(!config.api.is_configured());
+        assert!(config.scout_api.is_some());
+        assert!(!config.scout_api.as_ref().unwrap().is_configured());
         assert_eq!(config.translation.chunk_size_chars, 4000);
         assert_eq!(config.scraping.delay_between_requests_sec, 1.0);
     }
@@ -339,13 +374,20 @@ mod tests {
 
         let mut config = Config::default();
         config.api.key = "real-key".to_string();
+        config.scout_api.as_mut().unwrap().key = "scout-key".to_string();
         assert!(config.validate().is_ok());
     }
 
     #[test]
-    fn test_scout_api_fallback() {
+    fn test_config_validation_without_scout() {
+        let mut config = Config::default();
+        config.api.key = "real-key".to_string();
+        assert!(config.validate_with_options(false).is_ok());
+    }
+
+    #[test]
+    fn test_scout_api_required() {
         let config = Config::default();
-        // Should fall back to main API
-        assert_eq!(config.scout_api_config().model, config.api.model);
+        assert!(config.scout_api_config().is_err());
     }
 }

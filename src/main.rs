@@ -31,6 +31,10 @@ struct Args {
     #[arg(long)]
     no_name_pause: bool,
 
+    /// Disable name scouting entirely.
+    #[arg(long)]
+    no_name_scout: bool,
+
     /// Enable debug logging for scrapers.
     #[arg(long)]
     debug: bool,
@@ -55,6 +59,7 @@ struct ProcessParams<'a> {
     name_scout: &'a NameScout,
     name_mapping: &'a mut NameMappingStore,
     no_name_pause: bool,
+    no_name_scout: bool,
     config: &'a Config,
 }
 
@@ -81,7 +86,25 @@ async fn main() -> Result<()> {
         return Ok(());
     }
 
-    config.validate().context("Invalid configuration")?;
+    if !args.no_name_scout
+        && config
+            .scout_api
+            .as_ref()
+            .filter(|api| api.is_configured())
+            .is_none()
+    {
+        let config_path = Config::config_path()?;
+        console.warning(&format!(
+            "Name scout API key not configured. Please edit: {}",
+            config_path.display()
+        ));
+        console.info("Set scout_api.key in the config file and run again.");
+        return Ok(());
+    }
+
+    config
+        .validate_with_options(!args.no_name_scout)
+        .context("Invalid configuration")?;
     console.success("Configuration loaded");
 
     // Find appropriate scraper
@@ -143,9 +166,16 @@ async fn main() -> Result<()> {
     );
 
     // Initialize name scout
-    let scout_api = config.scout_api_config();
+    let scout_api = if args.no_name_scout {
+        config.api.clone()
+    } else {
+        config
+            .scout_api_config()
+            .context("Name scout API not configured")?
+            .clone()
+    };
     let name_scout = NameScout::new(
-        scout_api.clone(),
+        scout_api,
         config.name_scout.clone(),
         config.prompts.name_scout.clone(),
     );
@@ -163,6 +193,7 @@ async fn main() -> Result<()> {
         name_scout: &name_scout,
         name_mapping: &mut name_mapping,
         no_name_pause: args.no_name_pause,
+        no_name_scout: args.no_name_scout,
         config: &config,
     };
 
@@ -218,13 +249,18 @@ async fn process_oneshot(params: &mut ProcessParams<'_>) -> Result<()> {
     };
 
     // Run name scout
-    let scouted = run_name_scout(
-        params.console,
-        params.name_scout,
-        params.name_mapping,
-        &[(1, &params.novel_info.title, &content)],
-    )
-    .await?;
+    let scouted = if params.no_name_scout {
+        params.console.info("Name scout disabled; skipping");
+        false
+    } else {
+        run_name_scout(
+            params.console,
+            params.name_scout,
+            params.name_mapping,
+            &[(1, &params.novel_info.title, &content)],
+        )
+        .await?
+    };
 
     // Manual review (only if scouting was performed)
     if !params.no_name_pause && scouted {
@@ -351,13 +387,18 @@ async fn process_chapters(
         .map(|c| (c.number, c.title.as_str(), c.content.as_str()))
         .collect();
 
-    let scouted = run_name_scout(
-        params.console,
-        params.name_scout,
-        params.name_mapping,
-        &scout_data,
-    )
-    .await?;
+    let scouted = if params.no_name_scout {
+        params.console.info("Name scout disabled; skipping");
+        false
+    } else {
+        run_name_scout(
+            params.console,
+            params.name_scout,
+            params.name_mapping,
+            &scout_data,
+        )
+        .await?
+    };
 
     // Manual review (only if scouting was performed)
     if !params.no_name_pause && scouted {
