@@ -7,6 +7,7 @@
 
 pub mod config;
 pub mod console;
+mod cookies;
 pub mod error;
 pub mod name_mapping;
 pub mod name_scout;

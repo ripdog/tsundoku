@@ -103,6 +103,7 @@ tsundoku https://ncode.syosetu.com/n1234ab/
 - `--start N`: Start downloading from chapter N (1-based)
 - `--end N`: Stop downloading at chapter N (1-based, inclusive)
 - `--no-name-pause`: Skip manual name mapping review pause
+- `--debug`: Enable scraper debug logging
 
 ### Examples
 
@@ -117,6 +118,21 @@ Download without pausing for name review:
 ```bash
 tsundoku --no-name-pause https://kakuyomu.jp/works/1234567890
 ```
+
+### Pixiv Login Cookies
+
+Some Pixiv novels require login to access content. Tsundoku can load browser-exported
+Netscape cookie files automatically.
+
+1. Export cookies as a Netscape `*.txt` file (many browser extensions support this).
+2. Place the file in your Tsundoku config directory:
+   - Linux: `~/.config/Tsundoku/`
+   - macOS: `~/Library/Application Support/Tsundoku/`
+   - Windows: `%APPDATA%\Tsundoku\`
+3. Ensure the filename contains `pixiv` (case-insensitive).
+
+Tsundoku scans the config directory recursively, picks the most recently modified
+matching file, and sends those cookies to Pixiv requests.
 
 ## How It Works
 

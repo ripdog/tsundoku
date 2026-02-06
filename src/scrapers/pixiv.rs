@@ -4,13 +4,17 @@
 //! both individual novels and series.
 
 use super::{ChapterInfo, ChapterList, NovelInfo, Scraper, rate_limit};
+use crate::config::Config;
 use crate::config::ScrapingConfig;
+use crate::cookies::load_netscape_cookie_jar;
 use crate::error::ScraperError;
 use async_trait::async_trait;
 use regex::Regex;
 use reqwest::header::{HeaderMap, HeaderValue};
+use reqwest::cookie::Jar;
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
+use std::sync::Arc;
 use std::sync::LazyLock;
 
 /// Regex for individual novel URLs.
@@ -122,10 +126,40 @@ impl PixivScraper {
             HeaderValue::from_static("XMLHttpRequest"),
         );
 
+        let cookie_jar = match Config::config_dir() {
+            Ok(config_dir) => match load_netscape_cookie_jar(&config_dir, &["pixiv"]) {
+                Ok((jar, source)) => {
+                    if config.debug {
+                        if let Some(path) = source {
+                            eprintln!(
+                                "[Pixiv Debug] Loaded cookie file: {}",
+                                path.display()
+                            );
+                        } else {
+                            eprintln!("[Pixiv Debug] No cookie file found for pixiv");
+                        }
+                    }
+                    jar
+                }
+                Err(err) => {
+                    if config.debug {
+                        eprintln!("[Pixiv Debug] Failed to load cookies: {}", err);
+                    }
+                    Arc::new(Jar::default())
+                }
+            },
+            Err(err) => {
+                if config.debug {
+                    eprintln!("[Pixiv Debug] Could not find config dir: {}", err);
+                }
+                Arc::new(Jar::default())
+            }
+        };
+
         let client = reqwest::Client::builder()
             .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
             .default_headers(headers)
-            .cookie_store(true)
+            .cookie_provider(cookie_jar)
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .expect("Failed to create HTTP client");
